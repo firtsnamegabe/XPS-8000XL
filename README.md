@@ -1,6 +1,6 @@
 # XPS-8000XL
 
-A Linux and windows VST3 drum sampler built with JUCE.
+A Linux and windows VST drum sampler built with JUCE. VST3, LV2 AND NON SEQUENCER STANDALONE ARE AVAILABLE. 
 
 *Xolo Production Sampler 8000XL* — workflow modeled on classic hardware
 sample-groovebox conventions: 4 banks x 16 pads, drag-and-drop sample
