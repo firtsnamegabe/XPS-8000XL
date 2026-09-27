@@ -6,10 +6,10 @@ A Linux and windows VST3 drum sampler built with JUCE.
 sample-groovebox conventions: 4 banks x 16 pads, drag-and-drop sample
 loading, choke groups, chop tools, filters, lo-fi bit-crush and
 distortion, reverb ("Xolo Hall") and delay ("Xolo Echo") sends, velocity
-layers, MIDI Learn, light/dark theme, portable Kit save/load.
+layers, MIDI Learn, light/dark theme, portable Kit save/load and export edited .WAV files.
 
-<img width="1178" height="984" alt="xolo-xolo" src="https://github.com/user-attachments/assets/62067397-8553-4f3e-8637-d84986c58da8" />
-<img width="1178" height="984" alt="xolo-axolo" src="https://github.com/user-attachments/assets/70a15479-570f-405f-b62b-11c8100c5ea7" />
+<img width="1069" height="931" alt="tester" src="https://github.com/user-attachments/assets/baca0ca7-5e45-4572-aab2-70f0346bf61a" />
+<img width="1069" height="931" alt="tester2" src="https://github.com/user-attachments/assets/b8fb8b00-9aee-4a89-a1e3-e347d17c5225" />
 
 
 ## Features
