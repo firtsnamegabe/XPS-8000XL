@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # Project/target name is "XPS8000XL" (CMake identifiers can't have spaces).
 # The DAW-visible plugin name is PRODUCT_NAME below - "XPS-8000XL", short
 # for "Xolo Production Sampler 8000XL".
-project(XPS8000XL VERSION 0.1.0)
+project(XPS8000XL VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
