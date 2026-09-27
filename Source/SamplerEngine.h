@@ -7,9 +7,27 @@
 
 constexpr int kNumBanks = 4;
 constexpr int kPadsPerBank = 16;
+constexpr int kPadGridCols = 4; // the pad grid is 4x4 - pad index = row*kPadGridCols + col, row 0 = top
 constexpr int kMaxVoices = 32;
 constexpr int kNumChokeGroups = 6;
 constexpr int kTriggerQueueSize = 256;
+
+// Converts a pad's VISUAL grid index (0-15, row-major, row 0 = top,
+// col 0 = left - how PluginEditor lays out the 4x4 grid) into its
+// position in ascending NOTE order, so the default chromatic mapping
+// puts the lowest note at the bottom-left pad and the highest at the
+// top-right, like a piano keyboard or a musical staff (pitch rises
+// left-to-right AND bottom-to-top) rather than a plain reading-order
+// sweep (which would put the lowest note top-left, highest bottom-right).
+// Only the ROW is flipped - column order (left=low, right=high) already
+// matched what was wanted, so it's left alone.
+inline int noteOrderIndexForPad(int padIndex) noexcept
+{
+    const int row = padIndex / kPadGridCols;
+    const int col = padIndex % kPadGridCols;
+    const int gridRows = kPadsPerBank / kPadGridCols;
+    return (gridRows - 1 - row) * kPadGridCols + col;
+}
 
 using Bank = std::array<Pad, kPadsPerBank>;
 
@@ -319,6 +337,17 @@ public:
     // embed raw PCM in XML for internal round-tripping), this needs to be
     // an actual standards-compliant file other apps can open.
     bool exportPadToFile(int bankIndex, int padIndex, const juce::File& destFile) const;
+
+    // "Processed" counterpart to exportPadToFile(): same rendering
+    // resamplePad()/addLayerFromPad() use (filter, pitch, time-stretch,
+    // sends all baked in), written straight to a WAV file instead of
+    // loaded into another pad. exportAllProcessedPads() is the batch
+    // version behind the KIT menu's "Export All Pads" - exports every
+    // LOADED pad across all 4 banks as its own file, skipping empty
+    // pads, and returns how many were successfully written (continues
+    // past a single pad's failure rather than stopping the whole batch).
+    bool exportProcessedPadToFile(int bankIndex, int padIndex, const juce::File& destFile);
+    int exportAllProcessedPads(const juce::File& destFolder);
 
     // Resets a pad's processing parameters (volume, pitch/pitch mode/grain,
     // filter, envelope, reverb/delay sends, BPM stretch) to their defaults.

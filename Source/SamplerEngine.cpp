@@ -298,7 +298,7 @@ bool SamplerEngine::loadSampleIntoPad(int bankIndex, int padIndex, const juce::F
     pad.chopMarkers.clear();
 
     if (! pad.midiLearned.load())
-        pad.midiNote = midiNoteOffset + bankIndex * kPadsPerBank + padIndex;
+        pad.midiNote = midiNoteOffset + bankIndex * kPadsPerBank + noteOrderIndexForPad(padIndex);
 
     return true;
 }
@@ -437,7 +437,7 @@ bool SamplerEngine::loadSampleDataIntoPad(int bankIndex, int padIndex, juce::Aud
     pad.chopMarkers.clear();
 
     if (! pad.midiLearned.load())
-        pad.midiNote = midiNoteOffset + bankIndex * kPadsPerBank + padIndex;
+        pad.midiNote = midiNoteOffset + bankIndex * kPadsPerBank + noteOrderIndexForPad(padIndex);
 
     return true;
 }
@@ -561,7 +561,7 @@ void SamplerEngine::reassignChromaticNotes()
         {
             auto& pad = banks[(size_t) b][(size_t) p];
             if (! pad.midiLearned.load())
-                pad.midiNote = midiNoteOffset + b * kPadsPerBank + p;
+                pad.midiNote = midiNoteOffset + b * kPadsPerBank + noteOrderIndexForPad(p);
         }
 }
 
@@ -1450,7 +1450,7 @@ int SamplerEngine::commitChopsToPads(int sourceBankIndex, int sourcePadIndex,
         if (forceOneShot)
             dest.playMode = PlayMode::oneShot;
         if (! dest.midiLearned.load())
-            dest.midiNote = midiNoteOffset + destBank * kPadsPerBank + destPad;
+            dest.midiNote = midiNoteOffset + destBank * kPadsPerBank + noteOrderIndexForPad(destPad);
 
         ++chopsCreated;
     }
@@ -1607,6 +1607,60 @@ bool SamplerEngine::exportPadToFile(int bankIndex, int padIndex, const juce::Fil
     outStream.release();
     std::unique_ptr<juce::AudioFormatWriter> writer(rawWriter);
     return writer->writeFromAudioSampleBuffer(clip->data, start, end - start);
+}
+
+bool SamplerEngine::exportProcessedPadToFile(int bankIndex, int padIndex, const juce::File& destFile)
+{
+    juce::AudioBuffer<float> rendered;
+    if (! renderPadToBuffer(bankIndex, padIndex, rendered))
+        return false;
+
+    destFile.deleteFile(); // overwrite cleanly if it already exists
+    std::unique_ptr<juce::FileOutputStream> outStream(destFile.createOutputStream());
+    if (outStream == nullptr)
+        return false;
+
+    juce::WavAudioFormat wavFormat;
+    auto* rawWriter = wavFormat.createWriterFor(outStream.get(), sampleRate, 2, 32, {}, 0);
+    if (rawWriter == nullptr)
+        return false;
+
+    outStream.release();
+    std::unique_ptr<juce::AudioFormatWriter> writer(rawWriter);
+    return writer->writeFromAudioSampleBuffer(rendered, 0, rendered.getNumSamples());
+}
+
+int SamplerEngine::exportAllProcessedPads(const juce::File& destFolder)
+{
+    int exported = 0;
+    static const char bankLetters[kNumBanks] = { 'A', 'B', 'C', 'D' };
+
+    for (int b = 0; b < kNumBanks; ++b)
+    {
+        for (int p = 0; p < kPadsPerBank; ++p)
+        {
+            auto& pad = banks[(size_t) b][(size_t) p];
+            if (! pad.isLoaded())
+                continue;
+
+            const juce::String padLabel = juce::String::charToString(bankLetters[b])
+                                         + juce::String(p + 1).paddedLeft('0', 2);
+            const juce::String niceName = pad.displayName.isNotEmpty() ? pad.displayName : juce::String("Sample");
+            // createLegalFileName strips/replaces anything that isn't
+            // safe in a filename - displayName can carry characters from
+            // an originally-loaded file, or a resample/chop-generated
+            // name, that aren't guaranteed filesystem-safe as-is.
+            const auto fileName = padLabel + "_" + juce::File::createLegalFileName(niceName) + ".wav";
+
+            if (exportProcessedPadToFile(b, p, destFolder.getChildFile(fileName)))
+                ++exported;
+            // Deliberately continues past a single pad's failure rather
+            // than aborting the whole batch - better to come back with
+            // 15 of 16 pads than none, and the caller gets the count to
+            // notice if something was actually skipped.
+        }
+    }
+    return exported;
 }
 
 void SamplerEngine::resetPadEffects(int bankIndex, int padIndex)

@@ -82,10 +82,21 @@ private:
     bool dragArmed = false;
     std::unique_ptr<juce::FileChooser> fileChooser;
 
+    // Real, cached peak data for the small waveform preview drawn on the
+    // tile (see rebuildMiniWaveformIfNeeded) - replaces what used to be
+    // purely decorative random bar heights that never reflected the
+    // actual loaded audio at all.
+    static constexpr int kMiniWaveformBars = 14;
+    std::array<float, kMiniWaveformBars> miniWaveformPeaks {};
+    SampleClip::Ptr miniWaveformCachedClip;
+    int miniWaveformCachedTrimStart = -1;
+    int miniWaveformCachedTrimEnd = -1;
+
     void showContextMenu();
     void openSampleDialog();
     void openLayerDialog(bool velocitySplit);
     void openExportDialog();
+    void rebuildMiniWaveformIfNeeded();
 
     Pad& getPad() { return engine.getBank(bankIndex)[(size_t) padIndex]; }
 };

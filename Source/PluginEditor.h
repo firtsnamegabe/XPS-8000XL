@@ -78,6 +78,7 @@ private:
     bool wasRecording = false; // detects the recording->stopped transition for a one-shot status message
 
     void rebuildPadsForCurrentBank();
+    void updateNoteMapLabel(); // reflects the current midiNoteOffset + the fixed geometric note ordering (see noteOrderIndexForPad)
     void selectPad(int bankIndex, int padIndex);
     void showTab(Tab tab);
     void timerCallback() override; // clears "active" pad highlight after trigger
@@ -86,6 +87,7 @@ private:
     void saveKitAs();
     void loadKit();
     void confirmNewKit();
+    void exportAllPadsProcessed(); // KIT menu - every loaded pad's fully processed sound, one WAV per pad
     void refreshAfterKitLoad();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SamplePadEditor)

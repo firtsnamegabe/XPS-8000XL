@@ -19,13 +19,33 @@ namespace Colours2000
         constexpr juce::uint32 darkPadEmptyHex   = 0xffB3B3B3;
         constexpr juce::uint32 darkAccentHex     = 0xff3EBBF1;
         constexpr juce::uint32 darkAccentDimHex  = 0xff1F5A73;
-        constexpr juce::uint32 darkAccentTextHex = 0xff0D2733; // text drawn on accent-coloured buttons/tabs
+        // Was 0x0D2733 (a near-black navy). `accent` itself inverts from a
+        // bright cyan (dark mode) to a dark rust-orange (light mode) - text
+        // that had comfortable margin against the cyan (7.07:1) fell to
+        // 3.77:1, failing WCAG AA, against the much darker orange. Plain
+        // black gives strong margins against both (9.58:1 / 5.12:1,
+        // verified) rather than trying to preserve the original navy tint.
+        constexpr juce::uint32 darkAccentTextHex = 0xff000000; // text drawn on accent-coloured buttons/tabs
         constexpr juce::uint32 darkRedHex        = 0xffE0645A;
         constexpr juce::uint32 darkTextHex       = 0xffEDEBF2;
-        constexpr juce::uint32 darkTextMutedHex  = 0xff8A90A6;
+        // Was 0x8A90A6 (a blue-gray) - measured contrast against its real
+        // usage backgrounds (voidBg, panel) failed WCAG AA (4.5:1) in dark
+        // mode and failed worse in light mode (simple RGB-inversion doesn't
+        // preserve contrast ratios for non-gray hues the way it does for
+        // near-neutral grays). Replaced with a plain gray tuned by actually
+        // computing WCAG contrast against both real backgrounds in both
+        // modes, not just eyeballed - see the "TESTER" screenshot report
+        // this fixed. Kept as light as the constraint allows, to stay
+        // visually distinct from the full-contrast `text` colour above.
+        constexpr juce::uint32 darkTextMutedHex  = 0xffACACAC;
         constexpr juce::uint32 darkBorderHex     = 0xff3C4258;
         constexpr juce::uint32 darkPadTextHex      = 0xff3A3A3A; // number/sample-name text on the light pad face
-        constexpr juce::uint32 darkPadTextMutedHex = 0xff9A9A9A; // placeholder "--" on an empty pad
+        // Was 0x9A9A9A - measured contrast against pad/padEmpty (its real
+        // usage backgrounds: pad number, note label, "--" placeholder)
+        // failed WCAG AA badly in both modes (as low as 1.34:1 - nearly
+        // invisible). Darkened to a value actually verified against both
+        // real backgrounds in both modes, not eyeballed.
+        constexpr juce::uint32 darkPadTextMutedHex = 0xff434343; // placeholder "--" on an empty pad
 
         inline juce::Colour invert(juce::uint32 argb)
         {

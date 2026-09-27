@@ -1,4 +1,5 @@
 #include "PadComponent.h"
+#include <cmath>
 
 PadComponent::PadComponent(SamplerEngine& engineRef, int bankIdx, int padIdx)
     : engine(engineRef), bankIndex(bankIdx), padIndex(padIdx)
@@ -47,6 +48,50 @@ bool PadComponent::parseRegionDragDescription(const juce::String& desc, int& ban
     startSample = parts[2].getIntValue();
     endSample = parts[3].getIntValue();
     return true;
+}
+
+void PadComponent::rebuildMiniWaveformIfNeeded()
+{
+    auto& pad = getPad();
+    auto clip = pad.getClipForAudioThread();
+    const int rawTrimStart = pad.trimStart.load();
+    const int rawTrimEnd = pad.trimEnd.load();
+
+    if (clip == miniWaveformCachedClip
+        && rawTrimStart == miniWaveformCachedTrimStart
+        && rawTrimEnd == miniWaveformCachedTrimEnd)
+        return; // already up to date - the common case on most repaints
+
+    miniWaveformCachedClip = clip;
+    miniWaveformCachedTrimStart = rawTrimStart;
+    miniWaveformCachedTrimEnd = rawTrimEnd;
+
+    if (clip == nullptr || clip->data.getNumSamples() <= 0)
+    {
+        miniWaveformPeaks.fill(0.0f);
+        return;
+    }
+
+    const int length = clip->data.getNumSamples();
+    const int s = juce::jlimit(0, length, rawTrimStart);
+    // trimEnd == 0 is Pad's own sentinel for "end of sample" (see Pad.h) - not an empty range.
+    const int e = juce::jlimit(s, length, rawTrimEnd > 0 ? rawTrimEnd : length);
+    const int span = juce::jmax(1, e - s);
+    const int numChannels = clip->data.getNumChannels();
+
+    for (int bar = 0; bar < kMiniWaveformBars; ++bar)
+    {
+        const int segStart = s + (span * bar) / kMiniWaveformBars;
+        const int segEnd = juce::jmax(segStart + 1, s + (span * (bar + 1)) / kMiniWaveformBars);
+        float peak = 0.0f;
+        for (int ch = 0; ch < numChannels; ++ch)
+        {
+            const auto range = clip->data.findMinMax(ch, segStart, segEnd - segStart);
+            peak = juce::jmax(peak, std::abs(range.getStart()));
+            peak = juce::jmax(peak, std::abs(range.getEnd()));
+        }
+        miniWaveformPeaks[(size_t) bar] = peak;
+    }
 }
 
 void PadComponent::paint(juce::Graphics& g)
@@ -146,6 +191,26 @@ void PadComponent::paint(juce::Graphics& g)
                bounds.reduced(8.0f).removeFromTop(14.0f),
                juce::Justification::topLeft);
 
+    // Note name + number in the opposite (top-right) corner from the pad
+    // number, positioned below the choke-group dot / layer badge (y=4-16
+    // above) rather than beside them, so it never collides with either
+    // regardless of whether this specific pad has them. Skipped entirely
+    // below a minimum tile size - at the smallest pad size this UI allows
+    // (~69px, see PluginEditor's 300px minimum pad-area-width clamp), the
+    // math works out to a genuine 2px overlap with the waveform area
+    // below; better to just not draw it than fight for a couple of pixels
+    // or shrink the text to the point of being unreadable.
+    const int noteNum = pad.midiNote.load();
+    if (noteNum >= 0 && bounds.getHeight() >= 80.0f)
+    {
+        g.setColour(Colours2000::padTextMuted);
+        g.setFont(juce::Font(juce::FontOptions(8.0f)));
+        const auto noteName = juce::MidiMessage::getMidiNoteName(noteNum, true, true, 3); // octaveNumForMiddleC=3 - matches this project's own convention, see SamplerEngine.h
+        g.drawText(noteName + " " + juce::String(noteNum),
+                   juce::Rectangle<float>(bounds.getWidth() - 40.0f, 18.0f, 36.0f, 11.0f),
+                   juce::Justification::topRight);
+    }
+
     if (loaded)
     {
         // Carved from ONE sequentially-shrinking rect so the waveform strip
@@ -157,13 +222,17 @@ void PadComponent::paint(juce::Graphics& g)
         contentArea.removeFromBottom(2.0f);
         auto nameArea = contentArea.removeFromBottom(14.0f);
 
+        rebuildMiniWaveformIfNeeded();
         g.setColour(Colours2000::accentDim.withAlpha(0.7f));
-        juce::Random rnd(padIndex + bankIndex * 16);
-        const int bars = 14;
-        const float barW = waveArea.getWidth() / (float) bars;
-        for (int i = 0; i < bars; ++i)
+        const float barW = waveArea.getWidth() / (float) kMiniWaveformBars;
+        for (int i = 0; i < kMiniWaveformBars; ++i)
         {
-            const float h = juce::jmap(rnd.nextFloat(), 0.3f, 1.0f) * waveArea.getHeight();
+            // Real peak data (see rebuildMiniWaveformIfNeeded), not the
+            // decorative random heights this used to draw - a small floor
+            // keeps a near-silent bar a faint sliver rather than fully
+            // invisible, so it still reads as "quiet audio" rather than
+            // looking like a rendering glitch.
+            const float h = juce::jmax(0.04f, miniWaveformPeaks[(size_t) i]) * waveArea.getHeight();
             g.fillRect(waveArea.getX() + i * barW, waveArea.getBottom() - h, barW * 0.6f, h);
         }
 

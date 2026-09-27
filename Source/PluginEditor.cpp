@@ -131,7 +131,7 @@ SamplePadEditor::SamplePadEditor(SamplePadProcessor& p)
 
     noteMapLabel.setFont(juce::Font(juce::FontOptions(11.0f)));
     noteMapLabel.setColour(juce::Label::textColourId, Colours2000::textMuted);
-    noteMapLabel.setText("NOTE MAP: C1 -> PAD A01 - CHROMATIC", juce::dontSendNotification);
+    updateNoteMapLabel();
     addAndMakeVisible(noteMapLabel);
 
     rebuildPadsForCurrentBank();
@@ -238,6 +238,8 @@ void SamplePadEditor::showKitMenu()
     menu.addItem("Save Kit...", [this] { saveKitAs(); });
     menu.addItem("Load Kit...", [this] { loadKit(); });
     menu.addSeparator();
+    menu.addItem("Export All Pads (Processed)...", [this] { exportAllPadsProcessed(); });
+    menu.addSeparator();
     menu.addItem("New Kit...", [this] { confirmNewKit(); });
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&kitButton));
 }
@@ -296,6 +298,27 @@ void SamplePadEditor::loadKit()
     });
 }
 
+void SamplePadEditor::exportAllPadsProcessed()
+{
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Choose a folder for the exported WAV files",
+        juce::File::getSpecialLocation(juce::File::userMusicDirectory));
+
+    fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+        [this](const juce::FileChooser& fc)
+    {
+        auto folder = fc.getResult();
+        if (folder == juce::File{})
+            return;
+
+        midiStatusLabel.setText("EXPORTING...", juce::dontSendNotification);
+        const int exported = processorRef.getEngine().exportAllProcessedPads(folder);
+        midiStatusLabel.setText(exported > 0
+            ? "EXPORTED " + juce::String(exported) + " PAD" + (exported == 1 ? "" : "S")
+            : "NOTHING TO EXPORT", juce::dontSendNotification);
+    });
+}
+
 void SamplePadEditor::confirmNewKit()
 {
     auto options = juce::MessageBoxOptions()
@@ -328,7 +351,22 @@ void SamplePadEditor::refreshAfterKitLoad()
     bankTabs.updateTabStates();
     rebuildPadsForCurrentBank();
     masterPanel.refreshFromEngine();
+    updateNoteMapLabel(); // midiNoteOffset may have changed (Kit load / New Kit are the only ways it ever does)
     repaint();
+}
+
+void SamplePadEditor::updateNoteMapLabel()
+{
+    // The lowest-note pad is always visual index 12 (bottom-left, "PAD
+    // A13") by construction - noteOrderIndexForPad(12) == 0 for any grid
+    // this shape, so that pad's note is always exactly midiNoteOffset
+    // with no further arithmetic needed here.
+    const int lowestNote = processorRef.getEngine().getMidiNoteOffset();
+    // octaveNumForMiddleC=3 matches this project's own convention (note
+    // 36 = "C1" - see the midiNoteOffset default's comment in
+    // SamplerEngine.h), not JUCE's or any other tool's default numbering.
+    const auto noteName = juce::MidiMessage::getMidiNoteName(lowestNote, true, true, 3);
+    noteMapLabel.setText("NOTE MAP: " + noteName + " -> PAD A13 - CHROMATIC", juce::dontSendNotification);
 }
 
 void SamplePadEditor::timerCallback()
